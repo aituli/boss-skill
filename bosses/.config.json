@@ -1,0 +1,25 @@
+{
+  "bosses": {
+    "张总": {
+      "id": "24838444",
+      "name": "张总",
+      "slug": "张总",
+      "title": "CTO",
+      "version": "1.0.0",
+      "created_at": "2026-04-09T17:47:01.599538",
+      "updated_at": "2026-04-09T17:47:01.599540",
+      "usage_count": 0,
+      "tags": {
+        "management_style": "Hands-off",
+        "communication_style": "Direct",
+        "decision_style": "Data-driven",
+        "stress_response": "Angry"
+      },
+      "files": {
+        "mgmt": "张总_mgmt.md",
+        "persona": "张总_persona.md",
+        "patterns": "张总_patterns.json"
+      }
+    }
+  }
+}

@@ -1,324 +1,466 @@
 #!/usr/bin/env python3
 """
 Boss Skill Manager
-用于创建、列出、删除老板Skill的管理工具
-使用标准库，无需额外安装依赖
+管理老板Skill的创建、列表、删除等操作
 """
 
 import os
-import sys
 import json
-import argparse
+import re
+import hashlib
 from datetime import datetime
 from pathlib import Path
-
-BOSS_DIR = Path(__file__).parent.parent / "bosses"
-
-
-def ensure_boss_dir():
-    """确保bosses目录存在"""
-    BOSS_DIR.mkdir(parents=True, exist_ok=True)
+from typing import Dict, List, Optional
+import argparse
 
 
-def generate_slug(name):
-    """生成slug"""
-    return name.lower().replace(" ", "-").replace("_", "-")
-
-
-def cmd_create(args):
-    """创建一个新的老板Skill"""
+class BossManager:
+    """老板Skill管理器"""
     
-    name = args.name or input("老板姓名/称呼: ")
-    title = args.title or input("职位: ")
-    company = args.company or input("公司/部门: ")
-    style = args.style or input("管理风格 (micromanager/hands-off/coach/dictator/laissez-faire): ")
-    decision = args.decision or input("决策风格 (fast/cautious/consensus/gut-feeling/analytical): ")
+    def __init__(self, base_dir: str = None):
+        """初始化管理器"""
+        if base_dir is None:
+            self.base_dir = Path(__file__).parent.parent / "bosses"
+        else:
+            self.base_dir = Path(base_dir)
+        
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 配置文件路径
+        self.config_file = self.base_dir / ".config.json"
+        self.config = self._load_config()
     
-    slug = generate_slug(name)
-    boss_path = BOSS_DIR / slug
+    def _load_config(self) -> Dict:
+        """加载配置"""
+        if self.config_file.exists():
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {"bosses": {}}
     
-    if boss_path.exists():
-        print(f"错误: 老板Skill '{name}' 已存在")
-        sys.exit(1)
+    def _save_config(self):
+        """保存配置"""
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            json.dump(self.config, f, ensure_ascii=False, indent=2)
     
-    # 创建目录结构
-    boss_path.mkdir(parents=True)
-    (boss_path / "data").mkdir()
+    def _generate_slug(self, name: str) -> str:
+        """生成slug"""
+        slug = re.sub(r'[^\w\s-]', '', name.lower())
+        slug = re.sub(r'[-\s]+', '-', slug)
+        return slug.strip('-')
     
-    # 创建基础配置
-    config = {
-        "name": name,
-        "slug": slug,
-        "title": title,
-        "company": company,
-        "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat(),
-        "management_style": style,
-        "decision_style": decision,
-        "communication_style": "direct",
-        "version": 1
-    }
+    def _generate_id(self, name: str) -> str:
+        """生成唯一ID"""
+        timestamp = datetime.now().isoformat()
+        return hashlib.md5(f"{name}{timestamp}".encode()).hexdigest()[:8]
     
-    with open(boss_path / "config.json", "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    def create_boss(self, name: str, title: str = "", style_tags: Dict = None, 
+                    interactive: bool = True) -> Dict:
+        """
+        创建新的老板Skill
+        """
+        slug = self._generate_slug(name)
+        boss_id = self._generate_id(name)
+        
+        # 检查是否已存在
+        if slug in self.config["bosses"]:
+            print(f"老板Skill '{name}' 已存在 (slug: {slug})")
+            return self.config["bosses"][slug]
+        
+        # 创建老板目录
+        boss_dir = self.base_dir / slug
+        boss_dir.mkdir(exist_ok=True)
+        
+        # 基础信息
+        boss_info = {
+            "id": boss_id,
+            "name": name,
+            "slug": slug,
+            "title": title,
+            "version": "1.0.0",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "usage_count": 0,
+            "tags": style_tags or {},
+            "files": {
+                "mgmt": f"{slug}_mgmt.md",
+                "persona": f"{slug}_persona.md",
+                "patterns": f"{slug}_patterns.json"
+            }
+        }
+        
+        if interactive:
+            boss_info = self._interactive_intake(boss_info)
+        else:
+            self._create_default_files(boss_dir, boss_info)
+        
+        # 保存配置
+        self.config["bosses"][slug] = boss_info
+        self._save_config()
+        
+        print(f"成功创建老板Skill: {name} (slug: {slug})")
+        return boss_info
     
-    # 创建mgmt_skill.md模板
-    mgmt_template = f"""# Management Skill: {name}
+    def _interactive_intake(self, boss_info: Dict) -> Dict:
+        """交互式信息采集"""
+        print("\n" + "="*50)
+        print("Boss Skill 创建向导")
+        print("="*50 + "\n")
+        
+        name = input(f"老板姓名 [{boss_info['name']}]: ").strip() or boss_info['name']
+        boss_info['name'] = name
+        
+        title = input(f"职位 [{boss_info.get('title', '')}]: ").strip()
+        boss_info['title'] = title
+        
+        # 管理风格标签
+        print("\n管理风格标签")
+        
+        tags = {}
+        
+        print("\n1. 管理风格:")
+        print("   A. Micromanager  B. Hands-off  C. Coach  D. Dictator  E. Laissez-faire")
+        choice = input("   选择: ").strip().upper()
+        style_map = {'A': 'Micromanager', 'B': 'Hands-off', 'C': 'Coach',
+                     'D': 'Dictator', 'E': 'Laissez-faire'}
+        tags['management_style'] = style_map.get(choice, 'Hands-off')
+        
+        print("\n2. 沟通风格:")
+        print("   A. Direct  B. Indirect  C. Storyteller  D. Data-driven  E. Emotional")
+        choice = input("   选择: ").strip().upper()
+        comm_map = {'A': 'Direct', 'B': 'Indirect', 'C': 'Storyteller',
+                    'D': 'Data-driven', 'E': 'Emotional'}
+        tags['communication_style'] = comm_map.get(choice, 'Direct')
+        
+        print("\n3. 决策风格:")
+        print("   A. Fast  B. Cautious  C. Consensus  D. Gut-feeling  E. Analytical")
+        choice = input("   选择: ").strip().upper()
+        dec_map = {'A': 'Fast', 'B': 'Cautious', 'C': 'Consensus',
+                   'D': 'Gut-feeling', 'E': 'Analytical'}
+        tags['decision_style'] = dec_map.get(choice, 'Analytical')
+        
+        print("\n4. 压力表现:")
+        print("   A. Angry  B. Silent  C. Worried  D. Supportive  E. Absent")
+        choice = input("   选择: ").strip().upper()
+        stress_map = {'A': 'Angry', 'B': 'Silent', 'C': 'Worried',
+                      'D': 'Supportive', 'E': 'Absent'}
+        tags['stress_response'] = stress_map.get(choice, 'Angry')
+        
+        boss_info['tags'] = tags
+        
+        # 经典行为模式
+        print("\n经典行为模式")
+        
+        catchphrases = input("老板的口头禅（用逗号分隔）: ").strip()
+        boss_info['catchphrases'] = [p.strip() for p in catchphrases.split(',') if p.strip()]
+        
+        anger_signals = input("老板发火前的信号（用逗号分隔）: ").strip()
+        boss_info['anger_signals'] = [s.strip() for s in anger_signals.split(',') if s.strip()]
+        
+        # 生成文件
+        boss_dir = self.base_dir / boss_info['slug']
+        self._create_mgmt_file(boss_dir, boss_info)
+        self._create_persona_file(boss_dir, boss_info)
+        self._create_patterns_file(boss_dir, boss_info)
+        
+        return boss_info
+    
+    def _create_mgmt_file(self, boss_dir: Path, boss_info: Dict):
+        """创建管理Skill文件"""
+        tags = boss_info.get('tags', {})
+        
+        content = f"""---
+type: mgmt_skill
+boss_name: "{boss_info['name']}"
+version: "{boss_info['version']}"
+created_at: "{boss_info['created_at']}"
+tags:
+  management_style: {tags.get('management_style', 'Hands-off')}
+  decision_style: {tags.get('decision_style', 'Analytical')}
+---
 
-## 1. 战略思维框架
+# {boss_info['name']}的管理Skill
 
-### 1.1 业务优先级判断
-- 第一优先级：TBD
-- 决策权重：
-  - 收入增长：40%
-  - 成本控制：30%
-  - 用户体验：20%
-  - 团队稳定：10%
+## 战略思维框架
 
-### 1.2 资源分配逻辑
-- 人员招聘标准：TBD
-- 预算分配原则：TBD
-- 技术投入倾向：TBD
+### 业务优先级判断
+- 关注重点：结果导向，数据驱动
+- 决策依据：事实和数据优先
+- 优先级调整：根据市场变化灵活调整
 
-### 1.3 风险评估模型
-- 高风险信号：TBD
-- 风险容忍度：TBD
-- 应急预案偏好：TBD
+### 资源分配逻辑
+- 投资原则：ROI优先，快速验证
+- 预算态度：谨慎但支持有价值的投入
+- 风险控制：要求明确的止损点
 
-## 2. 管理方法论
+### 风险评估模型
+必问问题：
+- 最坏的情况是什么？
+- Plan B是什么？
+- 如何控制 downside？
 
-### 2.1 1on1沟通模式
-- 频率：TBD
-- 典型议程：TBD
-- 关注重点：TBD
-- 常问问题：TBD
+## 管理方法论
 
-### 2.2 绩效评价标准
-- 优秀员工特征：TBD
-- 警告信号：TBD
-- 晋升考量因素：TBD
+### 1on1沟通模式
+- 频率：根据项目阶段调整
+- 风格：{tags.get('management_style', 'Hands-off')}
+- 关注点：结果和进展
 
-### 2.3 激励机制
-- 物质激励偏好：TBD
-- 精神激励方式：TBD
-- 团队建设风格：TBD
+### 绩效评价标准
+- 优秀：超额完成目标 + 主动解决问题
+- 合格：完成既定目标
+- 不合格：未达目标且无合理原因
 
-## 3. 业务知识体系
-TBD
+### 激励机制
+- 主要方式：认可和成长机会
+- 反馈风格：直接但有建设性
 
-## 4. 沟通套路库
-TBD
+## 沟通套路库
+
+### 经典话术
 """
-    
-    with open(boss_path / "mgmt_skill.md", "w", encoding="utf-8") as f:
-        f.write(mgmt_template)
-    
-    # 创建persona.md模板
-    persona_template = f"""# Persona: {name}
+        
+        for phrase in boss_info.get('catchphrases', [])[:5]:
+            content += f'- "{phrase}"\n'
+        
+        content += """
+### 质疑方式
+- 「为什么这么想？」
+- 「还有别的方案吗？」
+- 「数据支撑是什么？」
 
-## Layer 1: 权威表现层
+### 决策信号
+- 快速通过：「可以」、「就这么办」
+- 需要再考虑：「再看看」、「再想想」
+- 即将拒绝：「有难度」、「我再考虑」
+"""
+        
+        mgmt_file = boss_dir / boss_info['files']['mgmt']
+        with open(mgmt_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+    
+    def _create_persona_file(self, boss_dir: Path, boss_info: Dict):
+        """创建人格Persona文件"""
+        tags = boss_info.get('tags', {})
+        
+        content = f"""---
+type: persona
+boss_name: "{boss_info['name']}"
+version: "{boss_info['version']}"
+created_at: "{boss_info['created_at']}"
+tags:
+  communication_style: {tags.get('communication_style', 'Direct')}
+  stress_response: {tags.get('stress_response', 'Angry')}
+---
+
+# {boss_info['name']}的人格Persona
+
+## 权威表现层
 
 ### 说话方式
-- 正式场合用语特征：TBD
-- 非正式场合用语特征：TBD
-- 微信/即时通讯风格：TBD
-- 邮件风格：TBD
-- 会议发言风格：TBD
+- 风格：{tags.get('communication_style', 'Direct')}
+- 句式：简洁明了，直击要点
+- 回复：及时但简洁
 
 ### 称呼习惯
-- 对下属的称呼方式：TBD
-- 希望被如何称呼：TBD
+- 对下属：使用姓名或昵称
+- 对同级：正式称呼
+- 对上级：尊重且专业
 
-### 非语言特征
-- 常用表情包类型：TBD
-- 标点符号习惯：TBD
-- 回复速度特征：TBD
+## 决策风格层
+- 类型：{tags.get('decision_style', 'Analytical')}
+- 特点：理性分析，重视数据
+- 习惯：需要充分信息才做决定
 
-## Layer 2: 决策风格层
+## 情绪模式层
 
-### 决策类型
-primary_style: {decision}
-secondary_style: TBD
+### 压力表现
+- 类型：{tags.get('stress_response', 'Angry')}
+- 触发点：目标未达成、重复错误
+- 恢复：较快，对事不对人
 
-### 决策特征
-- 信息收集习惯：TBD
-- 思考时间：TBD
-- 决策依据权重：TBD
-
-## Layer 3: 情绪模式层
-
-### 基础情绪特征
-- 默认情绪状态：TBD
-- 情绪恢复速度：TBD
-
-### 压力反应
-- 轻度压力表现：TBD
-- 中度压力表现：TBD
-- 重度压力表现：TBD
-
-### 情绪信号
-- 发火前兆：TBD
-- 心情好的信号：TBD
-- 疲惫/不在状态的信号：TBD
-
-## Layer 4: 人际策略层
-
-### 向下管理策略
-- 对不同绩效员工的区别对待：TBD
-- 信任建立方式：TBD
-- 权威维护方式：TBD
-
-### 向上管理风格
-- 对上级汇报的风格：TBD
-- 争取资源的方式：TBD
-
-## Layer 5: 身份认同层
-
-### 自我认知
-- 管理者身份认同：TBD
-- 专业身份认同：TBD
-
-### 价值观
-- 工作中最看重的品质：TBD
-- 不能容忍的行为：TBD
+### 发火前信号
 """
-    
-    with open(boss_path / "persona.md", "w", encoding="utf-8") as f:
-        f.write(persona_template)
-    
-    print(f"\n{'='*50}")
-    print(f"✓ 成功创建老板Skill")
-    print(f"{'='*50}")
-    print(f"名称: {name}")
-    print(f"Slug: {slug}")
-    print(f"职位: {title}")
-    print(f"公司: {company}")
-    print(f"管理风格: {style}")
-    print(f"决策风格: {decision}")
-    print(f"\n提示: 请编辑以下文件完善Skill内容:")
-    print(f"  - {boss_path / 'mgmt_skill.md'}")
-    print(f"  - {boss_path / 'persona.md'}")
-    print(f"{'='*50}\n")
+        
+        for signal in boss_info.get('anger_signals', []):
+            content += f'- {signal}\n'
+        
+        content += f"""
+### 好消息反应
+- 表面：认可但保持冷静
+- 内在：记录成绩，适时表扬
+- 后续：可能增加期望
 
+### 坏消息反应
+- 第一反应：询问原因
+- 第二反应：要求解决方案
+- 最终：根据态度决定是否追责
 
-def cmd_list(args):
-    """列出所有老板Skill"""
-    
-    bosses = []
-    if BOSS_DIR.exists():
-        for boss_dir in BOSS_DIR.iterdir():
-            if boss_dir.is_dir():
-                config_file = boss_dir / "config.json"
-                if config_file.exists():
-                    with open(config_file, "r", encoding="utf-8") as f:
-                        config = json.load(f)
-                        bosses.append(config)
-    
-    if not bosses:
-        print("暂无老板Skill，使用 'boss_manager create' 创建一个")
-        return
-    
-    print(f"\n{'='*80}")
-    print(f"{'Slug':<20} {'姓名':<15} {'职位':<20} {'管理风格':<15}")
-    print(f"{'='*80}")
-    
-    for boss in sorted(bosses, key=lambda x: x['created_at'], reverse=True):
-        print(f"{boss['slug']:<20} {boss['name']:<15} {boss['title']:<20} {boss['management_style']:<15}")
-    
-    print(f"{'='*80}\n")
+## 语言风格指南
 
+### 语气特征
+- 权威感：中到高
+- 直接度：高
+- 情感表达：克制
 
-def cmd_show(args):
-    """查看指定老板Skill的详情"""
+### 常用句式
+- 质疑：「为什么...」、「数据呢？」
+- 肯定：「可以」、「不错」
+- 否定：「再想想」、「还有优化空间」
+"""
+        
+        persona_file = boss_dir / boss_info['files']['persona']
+        with open(persona_file, 'w', encoding='utf-8') as f:
+            f.write(content)
     
-    slug = args.slug
-    boss_path = BOSS_DIR / slug
-    config_file = boss_path / "config.json"
+    def _create_patterns_file(self, boss_dir: Path, boss_info: Dict):
+        """创建行为模式文件"""
+        patterns = {
+            "catchphrases": boss_info.get('catchphrases', []),
+            "anger_signals": boss_info.get('anger_signals', []),
+            "question_patterns": [
+                "数据呢？",
+                "为什么这么想？",
+                "还有别的方案吗？",
+                "最坏的情况是什么？"
+            ],
+            "delay_phrases": [
+                "再想想",
+                "再看看",
+                "过两天再说"
+            ]
+        }
+        
+        patterns_file = boss_dir / boss_info['files']['patterns']
+        with open(patterns_file, 'w', encoding='utf-8') as f:
+            json.dump(patterns, f, ensure_ascii=False, indent=2)
     
-    if not config_file.exists():
-        print(f"错误: 找不到老板Skill '{slug}'")
-        sys.exit(1)
+    def _create_default_files(self, boss_dir: Path, boss_info: Dict):
+        """创建默认文件（非交互模式）"""
+        self._create_mgmt_file(boss_dir, boss_info)
+        self._create_persona_file(boss_dir, boss_info)
+        self._create_patterns_file(boss_dir, boss_info)
     
-    with open(config_file, "r", encoding="utf-8") as f:
-        config = json.load(f)
+    def list_bosses(self) -> List[Dict]:
+        """列出所有老板Skill"""
+        bosses = []
+        for slug, info in self.config.get("bosses", {}).items():
+            bosses.append(info)
+        
+        bosses.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return bosses
     
-    print(f"\n{'='*50}")
-    print(f"老板Skill: {config['name']}")
-    print(f"{'='*50}")
-    print(f"名称: {config['name']}")
-    print(f"Slug: {config['slug']}")
-    print(f"职位: {config['title']}")
-    print(f"公司: {config['company']}")
-    print(f"管理风格: {config['management_style']}")
-    print(f"决策风格: {config['decision_style']}")
-    print(f"版本: {config['version']}")
-    print(f"创建时间: {config['created_at'][:10]}")
-    print(f"{'='*50}\n")
-
-
-def cmd_delete(args):
-    """删除指定的老板Skill"""
+    def get_boss(self, slug: str) -> Optional[Dict]:
+        """获取指定老板Skill"""
+        return self.config.get("bosses", {}).get(slug)
     
-    slug = args.slug
-    boss_path = BOSS_DIR / slug
+    def delete_boss(self, slug: str) -> bool:
+        """删除老板Skill"""
+        if slug not in self.config.get("bosses", {}):
+            print(f"老板Skill '{slug}' 不存在")
+            return False
+        
+        boss_dir = self.base_dir / slug
+        if boss_dir.exists():
+            import shutil
+            shutil.rmtree(boss_dir)
+        
+        del self.config["bosses"][slug]
+        self._save_config()
+        
+        print(f"已删除老板Skill: {slug}")
+        return True
     
-    if not boss_path.exists():
-        print(f"错误: 找不到老板Skill '{slug}'")
-        sys.exit(1)
-    
-    confirm = input(f"确定要删除老板Skill '{slug}' 吗? (yes/no): ")
-    if confirm.lower() != 'yes':
-        print("已取消删除")
-        return
-    
-    import shutil
-    shutil.rmtree(boss_path)
-    
-    print(f"✓ 已删除老板Skill '{slug}'")
+    def update_usage(self, slug: str):
+        """更新使用次数"""
+        if slug in self.config.get("bosses", {}):
+            self.config["bosses"][slug]["usage_count"] = \
+                self.config["bosses"][slug].get("usage_count", 0) + 1
+            self.config["bosses"][slug]["updated_at"] = datetime.now().isoformat()
+            self._save_config()
 
 
 def main():
     """主函数"""
-    ensure_boss_dir()
+    parser = argparse.ArgumentParser(
+        description='Boss Skill Manager',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  python boss_manager.py create
+  python boss_manager.py create --name "张总" --title "CTO" --no-interactive
+  python boss_manager.py list
+  python boss_manager.py delete zhang
+        """
+    )
     
-    parser = argparse.ArgumentParser(description='Boss Skill Manager - 管理你的老板Skill')
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
     
     # create 命令
-    create_parser = subparsers.add_parser('create', help='创建一个新的老板Skill')
-    create_parser.add_argument('--name', help='老板的姓名或常用称呼')
-    create_parser.add_argument('--title', help='职位级别，如"技术总监"')
-    create_parser.add_argument('--company', help='所在公司或部门')
-    create_parser.add_argument('--style', 
-                              choices=['micromanager', 'hands-off', 'coach', 'dictator', 'laissez-faire'],
-                              help='管理风格类型')
-    create_parser.add_argument('--decision',
-                              choices=['fast', 'cautious', 'consensus', 'gut-feeling', 'analytical'],
-                              help='决策风格类型')
+    create_parser = subparsers.add_parser('create', help='创建新的老板Skill')
+    create_parser.add_argument('--name', help='老板姓名')
+    create_parser.add_argument('--title', help='职位')
+    create_parser.add_argument('--no-interactive', action='store_true', 
+                               help='非交互式创建')
     
     # list 命令
-    list_parser = subparsers.add_parser('list', help='列出所有老板Skill')
-    
-    # show 命令
-    show_parser = subparsers.add_parser('show', help='查看指定老板Skill的详情')
-    show_parser.add_argument('slug', help='老板Skill的slug')
+    subparsers.add_parser('list', help='列出所有老板Skill')
     
     # delete 命令
-    delete_parser = subparsers.add_parser('delete', help='删除指定的老板Skill')
+    delete_parser = subparsers.add_parser('delete', help='删除老板Skill')
     delete_parser.add_argument('slug', help='老板Skill的slug')
+    
+    # get 命令
+    get_parser = subparsers.add_parser('get', help='获取老板Skill详情')
+    get_parser.add_argument('slug', help='老板Skill的slug')
     
     args = parser.parse_args()
     
-    if args.command == 'create':
-        cmd_create(args)
-    elif args.command == 'list':
-        cmd_list(args)
-    elif args.command == 'show':
-        cmd_show(args)
-    elif args.command == 'delete':
-        cmd_delete(args)
-    else:
+    if not args.command:
         parser.print_help()
+        return
+    
+    manager = BossManager()
+    
+    if args.command == 'create':
+        if args.no_interactive:
+            if not args.name:
+                print("非交互模式需要提供 --name")
+                return
+            manager.create_boss(
+                name=args.name,
+                title=args.title or "",
+                interactive=False
+            )
+        else:
+            name = args.name or input("老板姓名: ").strip()
+            if not name:
+                print("需要提供姓名")
+                return
+            title = args.title or input("职位（可选）: ").strip()
+            manager.create_boss(name=name, title=title, interactive=True)
+    
+    elif args.command == 'list':
+        bosses = manager.list_bosses()
+        if not bosses:
+            print("暂无老板Skill")
+            return
+        
+        print(f"\n{'Slug':<15} {'姓名':<10} {'职位':<15} {'版本':<8}")
+        print("-" * 60)
+        
+        for boss in bosses:
+            print(f"{boss['slug']:<15} {boss['name']:<10} "
+                  f"{boss.get('title', '-'):<15} {boss['version']:<8}")
+    
+    elif args.command == 'delete':
+        manager.delete_boss(args.slug)
+    
+    elif args.command == 'get':
+        boss = manager.get_boss(args.slug)
+        if boss:
+            print(json.dumps(boss, ensure_ascii=False, indent=2))
+        else:
+            print(f"老板Skill '{args.slug}' 不存在")
 
 
 if __name__ == '__main__':

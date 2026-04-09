@@ -1,0 +1,251 @@
+{
+  "boss_types": {
+    "management_styles": {
+      "micromanager": {
+        "name": "细节控",
+        "emoji": "🔍",
+        "traits": ["事无巨细都要管", "频繁检查进度", "不信任下属"],
+        "communication": "主动高频汇报，提前准备细节，让他感觉'掌控一切'",
+        "quotes": ["这个像素偏移了2px", "每2小时同步一次进展", "让我看看代码"],
+        "dos": ["主动汇报每一个细节", "提前准备备选方案", "让他参与关键决策"],
+        "donts": ["擅自做决定", "隐瞒问题", "说他'管太多'"]
+      },
+      "hands-off": {
+        "name": "放手型",
+        "emoji": "🙌",
+        "traits": ["只关注结果", "过程完全不管", "给很大自由度"],
+        "communication": "主动寻求边界和反馈，定期同步关键节点",
+        "quotes": ["你看着办", "我只要结果", "过程我不关心"],
+        "dos": ["定期同步关键进展", "出问题及时升级", "明确边界和预期"],
+        "donts": ["从不汇报", "问题爆炸才说", "过度依赖他决策"]
+      },
+      "coach": {
+        "name": "教练型",
+        "emoji": "🏃",
+        "traits": ["耐心指导", "关注成长", "愿意培养人"],
+        "communication": "主动请教，展示学习意愿，接受批评建议",
+        "quotes": ["你觉得这样可以改进吗？", "我当年也犯过这个错", "重点是学到什么"],
+        "dos": ["主动寻求反馈", "展示学习成果", "接受挑战任务"],
+        "donts": ["敷衍了事", "重复犯同样错误", "拒绝成长机会"]
+      },
+      "dictator": {
+        "name": "独裁型",
+        "emoji": "👑",
+        "traits": ["一言堂", "不听意见", "要求绝对服从"],
+        "communication": "先执行再沟通，用数据改变他的想法，不要当众反驳",
+        "quotes": ["按我说的做", "不需要讨论", "这是命令"],
+        "dos": ["绝对服从执行", "私下委婉提建议", "准备充分数据"],
+        "donts": ["当众质疑", "直接反驳", "拖延执行"]
+      },
+      "laissez-faire": {
+        "name": "放任型",
+        "emoji": "🌊",
+        "traits": ["基本不出现", "团队自我管理", "很少干预"],
+        "communication": "主动建立规则，重要决策书面留痕",
+        "quotes": ["都行", "你们自己定", "我相信你们"],
+        "dos": ["主动建立团队规则", "重要决策书面确认", "定期同步状态"],
+        "donts": ["完全不打招呼", "关键决策不确认", "出了问题推诿"]
+      }
+    },
+    "decision_styles": {
+      "data-driven": {
+        "name": "数据控",
+        "emoji": "📊",
+        "traits": ["必须有数据支撑", "相信数字不相信直觉"],
+        "persuasion": "准备充分的数据分析报告，A/B测试结果",
+        "taboo": ["我觉得...", "凭经验...", "感觉上..."],
+        "needs": ["详细的数据表格", "对比分析", "ROI计算"]
+      },
+      "gut-feeling": {
+        "name": "直觉型",
+        "emoji": "🎯",
+        "traits": ["凭感觉决策", "相信第一印象"],
+        "persuasion": "讲案例故事，营造氛围，让他'感觉对'",
+        "taboo": ["堆砌大量数据表格", "过度分析", "犹豫不决"],
+        "needs": ["成功案例", "视觉展示", "情感共鸣"]
+      },
+      "fast": {
+        "name": "闪电型",
+        "emoji": "⚡",
+        "traits": ["快速决断", "不喜欢犹豫"],
+        "persuasion": "准备简洁的1页纸方案，当场给结论",
+        "taboo": ["我再想想", "让我考虑几天", "还需要调研"],
+        "needs": ["一页纸方案", "清晰的结论", "快速响应"]
+      },
+      "cautious": {
+        "name": "谨慎型",
+        "emoji": "🐢",
+        "traits": ["反复权衡", "需要很长时间"],
+        "persuasion": "提前1-2周铺垫，给足思考时间，准备Plan B",
+        "taboo": ["催他快做决定", "突然袭击", "信息不全"],
+        "needs": ["充足的时间", "完整信息", "风险评估"]
+      },
+      "consensus": {
+        "name": "民主型",
+        "emoji": "👥",
+        "traits": ["喜欢讨论", "听取多方意见"],
+        "persuasion": "提前私下沟通关键人，会上形成共识",
+        "taboo": ["突然袭击", "未经沟通就上会", "独断专行"],
+        "needs": ["多方意见", "讨论时间", "共识达成"]
+      }
+    },
+    "stress_responses": {
+      "angry": {
+        "name": "火山型",
+        "emoji": "😤",
+        "reaction": "发火、拍桌子、大声骂人",
+        "warning": "声音变大、语速加快、表情严肃",
+        "coping": "别顶嘴，让他发泄完，事后再沟通",
+        "recovery": "通常30分钟内平复"
+      },
+      "silent": {
+        "name": "冷暴力型",
+        "emoji": "🧊",
+        "reaction": "不回消息、不见人、冷处理",
+        "warning": "已读不回、取消会议、回避眼神",
+        "coping": "主动破冰，但不要逼太紧，给他空间",
+        "recovery": "可能需要1-2天"
+      },
+      "worried": {
+        "name": "焦虑传染型",
+        "emoji": "😰",
+        "reaction": "不断问'怎么办'，传递焦虑",
+        "warning": "频繁询问进展、失眠发朋友圈",
+        "coping": "给他确定的答案，'我已经处理了X，正在处理Y'",
+        "recovery": "问题解决后立即好转"
+      },
+      "supportive": {
+        "name": "战士型",
+        "emoji": "🦸",
+        "reaction": "更支持你，一起扛事",
+        "warning": "'我来协调'、'我们一起想办法'",
+        "coping": "感恩，事后一定要表达感谢",
+        "recovery": "问题结束即恢复"
+      }
+    },
+    "communication_styles": {
+      "direct": {
+        "name": "直球型",
+        "emoji": "🔪",
+        "traits": ["说话直接", "不绕弯子", "有时伤人"],
+        "communication": "不要玻璃心，有事直说，不要让他猜"
+      },
+      "indirect": {
+        "name": "含蓄型",
+        "emoji": "🎭",
+        "traits": ["话里有话", "暗示多过明示"],
+        "communication": "学会'听潜台词'，多确认理解是否正确"
+      },
+      "storyteller": {
+        "name": "故事型",
+        "emoji": "📚",
+        "traits": ["喜欢讲故事", "开会讲1小时背景"],
+        "communication": "耐心听完，从中提炼重点，适时拉回到主题"
+      },
+      "emotional": {
+        "name": "感性型",
+        "emoji": "❤️",
+        "traits": ["情绪波动大", "容易共情也容易被激怒"],
+        "communication": "先处理情绪再处理事情，多表达理解和认同"
+      }
+    },
+    "feedback_styles": {
+      "blunt": {
+        "name": "炸弹型",
+        "emoji": "💣",
+        "praise": "公开表扬，声音很大",
+        "criticism": "当众批评，不留情面",
+        "coping": "被批评时不要辩解，先认错，私下再解释"
+      },
+      "sandwich": {
+        "name": "三明治型",
+        "emoji": "🥪",
+        "praise": "真诚具体",
+        "criticism": "先肯定+批评+鼓励",
+        "coping": "听到表扬别飘，听到批评别慌"
+      },
+      "passive": {
+        "name": "暗示型",
+        "emoji": "😶",
+        "praise": "只是点点头",
+        "criticism": "不回复消息，或只说'嗯'",
+        "coping": "主动询问反馈，'您觉得这个方向对吗？'"
+      },
+      "public": {
+        "name": "公开处刑型",
+        "emoji": "🔥",
+        "praise": "群里@你表扬",
+        "criticism": "群里@你批评",
+        "coping": "被表扬谦虚，被批评私下道歉"
+      }
+    },
+    "hybrid_types": {
+      "micromanager_data": {
+        "name": "细节控+数据控",
+        "combination": ["micromanager", "data-driven"],
+        "description": "要数据还要细节，最难搞但也最好预测",
+        "strategy": "准备超级详细的报告，每个数字都要有来源",
+        "difficulty": "⭐⭐⭐⭐⭐"
+      },
+      "coach_fast": {
+        "name": "教练型+闪电决策",
+        "combination": ["coach", "fast"],
+        "description": "快速决定但会解释原因，适合成长",
+        "strategy": "抓住机会快速试错，事后认真复盘",
+        "difficulty": "⭐⭐"
+      },
+      "dictator_angry": {
+        "name": "独裁型+火山型",
+        "combination": ["dictator", "angry"],
+        "description": "暴君模式，一言不合就发火",
+        "strategy": "绝对服从，永远不要当众质疑",
+        "difficulty": "⭐⭐⭐⭐⭐"
+      },
+      "hands_off_cautious": {
+        "name": "放手型+谨慎型",
+        "combination": ["hands-off", "cautious"],
+        "description": "平时不管，但重大决策超级慢",
+        "strategy": "提前很久铺垫，用时间换空间",
+        "difficulty": "⭐⭐⭐"
+      },
+      "gut_passive": {
+        "name": "直觉型+暗示型",
+        "combination": ["gut-feeling", "passive"],
+        "description": "凭感觉决策，但不告诉你为什么",
+        "strategy": "多观察他的微表情，主动询问真实想法",
+        "difficulty": "⭐⭐⭐⭐"
+      }
+    }
+  },
+  "quick_test": {
+    "questions": [
+      {
+        "question": "他开周会，第一句话通常是？",
+        "mapping": {
+          "数据怎么样？": "data-driven",
+          "我简单说两句...": "storyteller",
+          "上周那件事谁负责？": "micromanager",
+          "大家有什么想法？": "consensus"
+        }
+      },
+      {
+        "question": "你发消息问'这个方案可以吗？'",
+        "mapping": {
+          "秒回'可以'": "fast",
+          "2小时后才回'再想想'": "cautious",
+          "不回": "passive",
+          "回5条语音分析问题": "micromanager"
+        }
+      },
+      {
+        "question": "项目出问题了，他的第一反应是？",
+        "mapping": {
+          "谁的责任？": "angry",
+          "怎么解决？": "supportive",
+          "不说话看着你": "silent",
+          "开始焦虑问怎么办": "worried"
+        }
+      }
+    ]
+  }
+}

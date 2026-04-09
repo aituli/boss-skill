@@ -1,314 +1,478 @@
 #!/usr/bin/env python3
 """
 Pattern Analyzer
-行为模式分析器 - 分析老板的行为模式和关注点
-使用标准库，无需额外安装依赖
+行为模式分析器 - 分析老板的行为模式、情绪周期、决策习惯
 """
 
 import os
-import sys
 import json
 import re
-import argparse
-from collections import Counter
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Counter
+from collections import defaultdict
 from datetime import datetime
-
-BOSS_DIR = Path(__file__).parent.parent / "bosses"
+import argparse
 
 
 class PatternAnalyzer:
     """行为模式分析器"""
     
-    def __init__(self, boss_slug):
-        self.boss_slug = boss_slug
-        self.boss_path = BOSS_DIR / boss_slug
-        self.config = self._load_config()
-        self.data_path = self.boss_path / "data"
-        self.data_path.mkdir(exist_ok=True)
+    # 常见口头禅
+    COMMON_CATCHPHRASES = [
+        '再想想', '我再说一遍', '简单说两句', '数据呢',
+        '为什么', '还有别的方案吗', '最坏的情况',
+        '做好了给你', '等公司', '我相信你', '你听懂了吗',
+        '明白吗', '懂了吗', '不错', '可以', '就这么办'
+    ]
     
-    def _load_config(self):
-        """加载配置"""
-        config_file = self.boss_path / "config.json"
-        if not config_file.exists():
-            raise FileNotFoundError(f"找不到老板Skill配置: {self.boss_slug}")
-        
-        with open(config_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+    # 发火信号词
+    ANGER_SIGNALS = [
+        '我再说一遍', '你听懂了吗', '深呼吸', '停顿',
+        '（沉默）', '语气变冷', '音量提高', '拍桌子'
+    ]
     
-    def analyze_keywords(self, text_data):
+    # 质疑模式
+    QUESTION_PATTERNS = [
+        r'数据[呢\?]?',
+        r'为什么',
+        r'还有别的',
+        r'最坏的情况',
+        r'plan\s*b',
+        r'怎么[解决办]',
+        r'责任[在谁]',
+    ]
+    
+    def __init__(self, bosses_dir: str = None):
+        """初始化分析器"""
+        if bosses_dir is None:
+            self.bosses_dir = Path(__file__).parent.parent / "bosses"
+        else:
+            self.bosses_dir = Path(bosses_dir)
+    
+    def analyze_boss(self, slug: str, source_data: Dict = None) -> Dict:
         """
-        分析关键词频率
+        分析老板行为模式
         
         Args:
-            text_data: 文本数据（如聊天记录、邮件等）
+            slug: 老板slug
+            source_data: 可选的原始数据
         
         Returns:
-            dict: 关键词分析结果
+            分析结果
         """
-        # 常见业务关键词
-        business_keywords = [
-            '增长', '收入', '成本', '利润', '用户', '客户',
-            '产品', '技术', '运营', '市场', '销售',
-            '团队', '管理', '绩效', '目标', 'KPI',
-            '风险', '问题', '机会', '挑战', '竞争'
-        ]
+        boss_dir = self.bosses_dir / slug
+        patterns_file = boss_dir / f"{slug}_patterns.json"
         
-        word_counts = Counter()
+        # 加载已有模式
+        existing_patterns = {}
+        if patterns_file.exists():
+            with open(patterns_file, 'r', encoding='utf-8') as f:
+                existing_patterns = json.load(f)
         
-        for keyword in business_keywords:
-            count = text_data.lower().count(keyword)
-            if count > 0:
-                word_counts[keyword] = count
+        # 如果有新数据，进行分析
+        if source_data:
+            new_patterns = self._extract_patterns_from_data(source_data)
+            existing_patterns.update(new_patterns)
+            
+            # 保存更新
+            with open(patterns_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_patterns, f, ensure_ascii=False, indent=2)
         
-        return dict(word_counts.most_common(10))
+        return existing_patterns
     
-    def analyze_catchphrases(self, text_data):
-        """
-        分析口头禅
+    def _extract_patterns_from_data(self, data: Dict) -> Dict:
+        """从数据中提取行为模式"""
+        patterns = {
+            'catchphrases': [],
+            'anger_signals': [],
+            'question_patterns': [],
+            'focus_keywords': [],
+            'decision_indicators': {},
+            'emotion_patterns': {},
+        }
         
-        Args:
-            text_data: 文本数据
+        # 分析消息内容
+        messages = data.get('messages', [])
+        if messages:
+            patterns['catchphrases'] = self._extract_catchphrases(messages)
+            patterns['anger_signals'] = self._detect_anger_signals(messages)
+            patterns['question_patterns'] = self._extract_question_patterns(messages)
+            patterns['focus_keywords'] = self._extract_focus_keywords(messages)
         
-        Returns:
-            list: 常见口头禅
-        """
-        # 常见老板口头禅模式
-        patterns = [
-            r'(简单说两句.*?)(?:\n|$)',
-            r'(这个事我提过很多次了)',
-            r'(我不是批评你，但是)',
-            r'(再想想)',
-            r'(我再说一遍)',
-            r'(数据呢)',
-            r'(为什么这么想)',
-            r'(最坏的情况是什么)',
-            r'(做好了.*给你)',
-            r'(等.*再说)',
-            r'(你听懂了吗)',
-            r'(咱们打开天窗说亮话)'
-        ]
+        # 分析会议纪要
+        meetings = data.get('meetings', [])
+        if meetings:
+            patterns['decision_indicators'] = self._analyze_decision_patterns(meetings)
         
-        catchphrases = []
-        
-        for pattern in patterns:
-            matches = re.findall(pattern, text_data, re.IGNORECASE)
-            if matches:
-                catchphrases.append(matches[0])
-        
-        # 统计频率
-        phrase_counts = Counter(catchphrases)
-        return phrase_counts.most_common(5)
+        return patterns
     
-    def analyze_anger_signals(self, text_data):
-        """
-        分析发火信号
+    def _extract_catchphrases(self, messages: List[str]) -> List[Tuple[str, int]]:
+        """提取口头禅及频率"""
+        phrase_counts = Counter()
         
-        Args:
-            text_data: 文本数据
+        for msg in messages:
+            for phrase in self.COMMON_CATCHPHRASES:
+                if phrase in msg:
+                    phrase_counts[phrase] += 1
         
-        Returns:
-            list: 发火前兆信号
-        """
-        anger_indicators = [
-            '我再说一遍',
-            '你听懂了吗',
-            '（深呼吸）',
-            '（停顿）',
-            '算了',
-            '我不想再说',
-            '就这样吧',
-            '你自己看着办'
-        ]
-        
+        # 返回频率最高的10个
+        return phrase_counts.most_common(10)
+    
+    def _detect_anger_signals(self, messages: List[str]) -> List[str]:
+        """检测发火信号"""
         signals = []
-        for indicator in anger_indicators:
-            if indicator in text_data:
-                signals.append(indicator)
         
-        return signals
+        for msg in messages:
+            for signal in self.ANGER_SIGNALS:
+                if signal in msg:
+                    signals.append(signal)
+        
+        return list(set(signals))  # 去重
     
-    def analyze_decision_patterns(self, text_data):
-        """
-        分析决策模式
+    def _extract_question_patterns(self, messages: List[str]) -> List[Tuple[str, int]]:
+        """提取质疑模式"""
+        pattern_counts = Counter()
         
-        Args:
-            text_data: 文本数据
+        for msg in messages:
+            for pattern in self.QUESTION_PATTERNS:
+                if re.search(pattern, msg, re.IGNORECASE):
+                    pattern_counts[pattern] += 1
         
-        Returns:
-            dict: 决策模式分析
-        """
-        # 决策相关关键词
-        decision_keywords = {
-            'data_driven': ['数据', '指标', '分析', '统计', '报告'],
-            'gut_feeling': ['感觉', '直觉', '觉得', '可能', '应该'],
-            'consensus': ['讨论', '商量', '意见', '大家', '团队'],
-            'fast': ['马上', '立即', '尽快', '现在', '快点'],
-            'cautious': ['再看看', '考虑', '研究', '等等', '观察']
+        return pattern_counts.most_common(5)
+    
+    def _extract_focus_keywords(self, messages: List[str], top_n: int = 10) -> List[Tuple[str, int]]:
+        """提取关注关键词"""
+        # 业务关键词列表
+        business_keywords = [
+            '增长', '成本', '收入', '利润', '用户', '留存', '转化',
+            '体验', '效率', '质量', '风险', '竞争', '市场',
+            '产品', '技术', '运营', '销售', '客户'
+        ]
+        
+        keyword_counts = Counter()
+        
+        for msg in messages:
+            for keyword in business_keywords:
+                if keyword in msg:
+                    keyword_counts[keyword] += 1
+        
+        return keyword_counts.most_common(top_n)
+    
+    def _analyze_decision_patterns(self, meetings: List[Dict]) -> Dict:
+        """分析决策模式"""
+        indicators = {
+            'avg_decision_time': 0,  # 平均决策时间（天）
+            'data_driven_ratio': 0,  # 数据驱动决策比例
+            'consensus_ratio': 0,    # 协商决策比例
+            'reversal_rate': 0,      # 决策反转率
         }
         
-        pattern_scores = {}
+        # TODO: 实现具体的决策模式分析逻辑
         
-        for pattern, keywords in decision_keywords.items():
-            score = sum(text_data.count(kw) for kw in keywords)
-            pattern_scores[pattern] = score
-        
-        return pattern_scores
+        return indicators
     
-    def generate_priority_radar(self, text_data):
+    def analyze_emotion_cycle(self, messages: List[Dict]) -> Dict:
         """
-        生成优先级雷达
+        分析情绪周期
         
         Args:
-            text_data: 文本数据
+            messages: 带时间戳的消息列表，每项包含 'time' 和 'content'
         
         Returns:
-            dict: 优先级分析
+            情绪周期分析结果
         """
-        priorities = {
-            '增长': text_data.count('增长') + text_data.count('growth'),
-            '成本': text_data.count('成本') + text_data.count('cost'),
-            '体验': text_data.count('体验') + text_data.count('用户体验'),
-            '效率': text_data.count('效率') + text_data.count('效能'),
-            '质量': text_data.count('质量') + text_data.count('品质'),
-            '团队': text_data.count('团队') + text_data.count('人员')
+        # 按小时和星期几分组的情绪统计
+        hourly_emotion = defaultdict(list)
+        daily_emotion = defaultdict(list)
+        
+        for msg in messages:
+            time_str = msg.get('time', '')
+            content = msg.get('content', '')
+            
+            try:
+                dt = datetime.fromisoformat(time_str)
+                hour = dt.hour
+                weekday = dt.weekday()  # 0=Monday, 6=Sunday
+                
+                # 简单情绪分析（基于关键词）
+                emotion = self._detect_emotion(content)
+                
+                hourly_emotion[hour].append(emotion)
+                daily_emotion[weekday].append(emotion)
+            except:
+                continue
+        
+        # 计算各时段平均情绪
+        hourly_avg = {}
+        for hour, emotions in hourly_emotion.items():
+            hourly_avg[hour] = sum(emotions) / len(emotions) if emotions else 0
+        
+        daily_avg = {}
+        for day, emotions in daily_emotion.items():
+            daily_avg[day] = sum(emotions) / len(emotions) if emotions else 0
+        
+        return {
+            'hourly_pattern': hourly_avg,
+            'daily_pattern': daily_avg,
+            'best_communication_time': self._find_best_time(hourly_avg, daily_avg),
+            'avoid_time': self._find_avoid_time(hourly_avg, daily_avg),
+        }
+    
+    def _detect_emotion(self, content: str) -> float:
+        """
+        检测情绪值 (-1 到 1)
+        -1: 非常负面 (发火)
+        0: 中性
+        1: 非常正面 (高兴)
+        """
+        emotion = 0.0
+        
+        # 负面信号
+        negative_signals = [
+            '不行', '错了', '问题', '怎么回事', '为什么', '糟糕',
+            '严重', '必须', '立即', '马上', '怎么会'
+        ]
+        
+        # 正面信号
+        positive_signals = [
+            '不错', '很好', '优秀', '赞', '棒', '可以', '满意',
+            '谢谢', '感谢', '做得好'
+        ]
+        
+        for signal in negative_signals:
+            if signal in content:
+                emotion -= 0.2
+        
+        for signal in positive_signals:
+            if signal in content:
+                emotion += 0.2
+        
+        # 限制在 -1 到 1 之间
+        return max(-1, min(1, emotion))
+    
+    def _find_best_time(self, hourly: Dict, daily: Dict) -> str:
+        """找出最佳沟通时间"""
+        # 找平均情绪最高的时段
+        if hourly:
+            best_hour = max(hourly.items(), key=lambda x: x[1])[0]
+        else:
+            best_hour = 10  # 默认上午10点
+        
+        if daily:
+            best_day = max(daily.items(), key=lambda x: x[1])[0]
+        else:
+            best_day = 0  # 默认周一
+        
+        day_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        
+        return f"{day_names[best_day]}上午{best_hour}:00左右"
+    
+    def _find_avoid_time(self, hourly: Dict, daily: Dict) -> str:
+        """找出避免沟通的时间"""
+        # 找平均情绪最低的时段
+        if hourly:
+            worst_hour = min(hourly.items(), key=lambda x: x[1])[0]
+        else:
+            worst_hour = 17  # 默认下午5点
+        
+        if daily:
+            worst_day = min(daily.items(), key=lambda x: x[1])[0]
+        else:
+            worst_day = 4  # 默认周五
+        
+        day_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        
+        return f"{day_names[worst_day]}下午{worst_hour}:00左右"
+    
+    def generate_insights(self, slug: str) -> Dict:
+        """生成洞察报告"""
+        patterns = self.analyze_boss(slug)
+        
+        insights = {
+            'communication_style': self._infer_communication_style(patterns),
+            'decision_style': self._infer_decision_style(patterns),
+            'pressure_points': self._identify_pressure_points(patterns),
+            'motivation_triggers': self._identify_motivation_triggers(patterns),
+            'warning_signals': self._identify_warning_signals(patterns),
         }
         
-        # 归一化到百分比
-        total = sum(priorities.values())
-        if total > 0:
-            priorities = {k: round(v/total*100, 1) for k, v in priorities.items()}
+        return insights
+    
+    def _infer_communication_style(self, patterns: Dict) -> str:
+        """推断沟通风格"""
+        catchphrases = patterns.get('catchphrases', [])
         
-        return priorities
-    
-    def generate_full_report(self, text_data):
-        """
-        生成完整的分析报告
+        # 基于口头禅推断
+        direct_indicators = ['不行', '错了', '就这么办', '立即']
+        indirect_indicators = ['再想想', '再看看', '考虑一下']
         
-        Args:
-            text_data: 文本数据
+        direct_score = sum(1 for phrase, _ in catchphrases if any(ind in phrase for ind in direct_indicators))
+        indirect_score = sum(1 for phrase, _ in catchphrases if any(ind in phrase for ind in indirect_indicators))
         
-        Returns:
-            dict: 完整分析报告
-        """
-        report = {
-            "boss_name": self.config['name'],
-            "analysis_date": datetime.now().isoformat(),
-            "keyword_analysis": self.analyze_keywords(text_data),
-            "catchphrases": self.analyze_catchphrases(text_data),
-            "anger_signals": self.analyze_anger_signals(text_data),
-            "decision_patterns": self.analyze_decision_patterns(text_data),
-            "priority_radar": self.generate_priority_radar(text_data)
-        }
+        if direct_score > indirect_score:
+            return "Direct（直接型）"
+        elif indirect_score > direct_score:
+            return "Indirect（含蓄型）"
+        else:
+            return "Balanced（平衡型）"
+    
+    def _infer_decision_style(self, patterns: Dict) -> str:
+        """推断决策风格"""
+        questions = patterns.get('question_patterns', [])
         
-        # 保存报告
-        report_file = self.data_path / "pattern_report.json"
-        with open(report_file, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+        data_indicators = ['数据', '指标', '数字']
+        gut_indicators = ['觉得', '感觉', '直觉']
         
-        return report
-
-
-def print_report(report, use_json=False):
-    """打印报告"""
+        data_score = sum(1 for q, _ in questions if any(ind in q for ind in data_indicators))
+        gut_score = sum(1 for q, _ in questions if any(ind in q for ind in gut_indicators))
+        
+        if data_score > gut_score:
+            return "Data-driven（数据驱动型）"
+        elif gut_score > data_score:
+            return "Gut-feeling（直觉型）"
+        else:
+            return "Analytical（分析型）"
     
-    if use_json:
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-        return
+    def _identify_pressure_points(self, patterns: Dict) -> List[str]:
+        """识别压力触发点"""
+        anger_signals = patterns.get('anger_signals', [])
+        
+        # 基于发火信号推断压力点
+        pressure_points = []
+        
+        if any('数据' in str(signal) for signal in anger_signals):
+            pressure_points.append("数据不准确/缺失")
+        if any('重复' in str(signal) for signal in anger_signals):
+            pressure_points.append("重复犯错")
+        if any('延期' in str(signal) or 'delay' in str(signal) for signal in anger_signals):
+            pressure_points.append("项目延期")
+        
+        if not pressure_points:
+            pressure_points = ["目标未达成", "质量问题", "沟通不畅"]
+        
+        return pressure_points
     
-    print(f"\n{'='*60}")
-    print(f"📊 {report['boss_name']} 的行为模式分析报告")
-    print(f"{'='*60}")
-    print(f"分析日期: {report['analysis_date'][:10]}")
+    def _identify_motivation_triggers(self, patterns: Dict) -> List[str]:
+        """识别激励触发点"""
+        catchphrases = patterns.get('catchphrases', [])
+        
+        triggers = []
+        
+        vision_indicators = ['做好了', '未来', '相信', '一定']
+        recognition_indicators = ['不错', '很好', '优秀']
+        
+        vision_score = sum(count for phrase, count in catchphrases if any(ind in phrase for ind in vision_indicators))
+        recognition_score = sum(count for phrase, count in catchphrases if any(ind in phrase for ind in recognition_indicators))
+        
+        if vision_score > 0:
+            triggers.append("愿景激励（画饼）")
+        if recognition_score > 0:
+            triggers.append("认可表扬")
+        
+        if not triggers:
+            triggers = ["结果导向的认可", "成长机会"]
+        
+        return triggers
     
-    print(f"\n{'─'*60}")
-    print("关键词分析 TOP10:")
-    for word, count in report['keyword_analysis'].items():
-        print(f"  • {word}: {count}次")
+    def _identify_warning_signals(self, patterns: Dict) -> List[str]:
+        """识别警告信号"""
+        signals = patterns.get('anger_signals', [])
+        
+        if not signals:
+            return [
+                "语气变冷",
+                "回复变慢",
+                "使用'再想想'",
+                "追问细节"
+            ]
+        
+        return signals[:5]
     
-    print(f"\n{'─'*60}")
-    print("口头禅:")
-    if report['catchphrases']:
-        for phrase, count in report['catchphrases']:
-            print(f"  • \"{phrase}\" ({count}次)")
-    else:
-        print("  (未识别到常见口头禅)")
-    
-    print(f"\n{'─'*60}")
-    print("发火信号:")
-    if report['anger_signals']:
-        for signal in report['anger_signals']:
-            print(f"  ⚠️  {signal}")
-    else:
-        print("  (未识别到发火信号)")
-    
-    print(f"\n{'─'*60}")
-    print("决策模式:")
-    for pattern, score in sorted(report['decision_patterns'].items(), key=lambda x: x[1], reverse=True):
-        bar = "█" * min(score, 20)
-        print(f"  {pattern:<20} {bar} ({score})")
-    
-    print(f"\n{'─'*60}")
-    print("优先级雷达:")
-    for priority, percentage in sorted(report['priority_radar'].items(), key=lambda x: x[1], reverse=True):
-        bar = "█" * int(percentage / 5)
-        print(f"  {priority:<10} {bar} {percentage}%")
-    
-    print(f"{'='*60}\n")
+    def print_analysis_report(self, slug: str):
+        """打印分析报告"""
+        patterns = self.analyze_boss(slug)
+        insights = self.generate_insights(slug)
+        
+        print(f"\n{'='*60}")
+        print(f"📊 老板行为模式分析报告: {slug}")
+        print(f"{'='*60}\n")
+        
+        print("【口头禅Top5】")
+        for phrase, count in patterns.get('catchphrases', [])[:5]:
+            print(f"  • \"{phrase}\" - 出现 {count} 次")
+        
+        print("\n【质疑模式】")
+        for pattern, count in patterns.get('question_patterns', [])[:5]:
+            print(f"  • {pattern} - {count} 次")
+        
+        print("\n【关注关键词】")
+        for keyword, count in patterns.get('focus_keywords', [])[:5]:
+            print(f"  • {keyword} - {count} 次")
+        
+        print("\n【洞察】")
+        print(f"  沟通风格: {insights['communication_style']}")
+        print(f"  决策风格: {insights['decision_style']}")
+        
+        print("\n  压力触发点:")
+        for point in insights['pressure_points']:
+            print(f"    • {point}")
+        
+        print("\n  激励触发点:")
+        for trigger in insights['motivation_triggers']:
+            print(f"    • {trigger}")
+        
+        print("\n  警告信号:")
+        for signal in insights['warning_signals']:
+            print(f"    • {signal}")
+        
+        print(f"\n{'='*60}\n")
 
 
 def main():
-    """命令行入口"""
+    """主函数"""
+    parser = argparse.ArgumentParser(
+        description='Pattern Analyzer - 行为模式分析器',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  # 分析现有老板Skill
+  python pattern_analyzer.py analyze zhang
+  
+  # 从数据中提取新模式
+  python pattern_analyzer.py extract zhang --data messages.json
+        """
+    )
     
-    parser = argparse.ArgumentParser(description='Boss Skill 行为模式分析器')
-    parser.add_argument('boss_slug', help='老板Skill的slug')
-    parser.add_argument('--file', '-f', help='文本数据文件路径')
-    parser.add_argument('--text', '-t', help='直接输入文本')
-    parser.add_argument('--report', '-r', action='store_true', help='生成完整报告')
-    parser.add_argument('--json', '-j', action='store_true', help='以JSON格式输出')
+    subparsers = parser.add_subparsers(dest='command', help='可用命令')
+    
+    # analyze 命令
+    analyze_parser = subparsers.add_parser('analyze', help='分析老板行为模式')
+    analyze_parser.add_argument('boss', help='老板slug')
+    
+    # extract 命令
+    extract_parser = subparsers.add_parser('extract', help='从数据提取模式')
+    extract_parser.add_argument('boss', help='老板slug')
+    extract_parser.add_argument('--data', required=True, help='数据文件路径(JSON)')
     
     args = parser.parse_args()
     
-    try:
-        analyzer = PatternAnalyzer(args.boss_slug)
-        
-        # 获取文本数据
-        if args.file:
-            with open(args.file, "r", encoding="utf-8") as f:
-                text_data = f.read()
-        elif args.text:
-            text_data = args.text
-        else:
-            # 如果没有提供数据，显示现有报告
-            report_file = analyzer.data_path / "pattern_report.json"
-            if report_file.exists():
-                with open(report_file, "r", encoding="utf-8") as f:
-                    report = json.load(f)
-                print_report(report, args.json)
-                return
-            else:
-                print("提示: 请提供 --file 或 --text 参数进行分析")
-                print("示例:")
-                print(f"  python3 pattern_analyzer.py {args.boss_slug} --file chat_logs.txt")
-                print(f"  python3 pattern_analyzer.py {args.boss_slug} --text '这里输入文本内容'")
-                sys.exit(0)
-        
-        # 生成完整报告
-        report = analyzer.generate_full_report(text_data)
-        print_report(report, args.json)
-        
-        if not args.json:
-            print(f"✓ 报告已保存到: {analyzer.data_path / 'pattern_report.json'}")
+    if not args.command:
+        parser.print_help()
+        return
     
-    except FileNotFoundError as e:
-        print(f"错误: {e}")
-        print(f"提示: 使用 'boss_manager create' 创建老板Skill")
-        sys.exit(1)
-    except Exception as e:
-        print(f"错误: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    analyzer = PatternAnalyzer()
+    
+    if args.command == 'analyze':
+        analyzer.print_analysis_report(args.boss)
+    
+    elif args.command == 'extract':
+        # 加载数据
+        with open(args.data, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        patterns = analyzer.analyze_boss(args.boss, data)
+        print(f"✅ 已从数据中提取模式并保存")
+        print(json.dumps(patterns, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':
