@@ -1,0 +1,46 @@
+{
+  "boss_name": "张总",
+  "analysis_date": "2026-04-09T17:32:20.054936",
+  "keyword_analysis": {
+    "增长": 1,
+    "成本": 1
+  },
+  "catchphrases": [
+    [
+      "再想想",
+      1
+    ],
+    [
+      "数据呢",
+      1
+    ],
+    [
+      "为什么这么想",
+      1
+    ],
+    [
+      "最坏的情况是什么",
+      1
+    ],
+    [
+      "做好了给你",
+      1
+    ]
+  ],
+  "anger_signals": [],
+  "decision_patterns": {
+    "data_driven": 2,
+    "gut_feeling": 0,
+    "consensus": 0,
+    "fast": 0,
+    "cautious": 0
+  },
+  "priority_radar": {
+    "增长": 50.0,
+    "成本": 50.0,
+    "体验": 0.0,
+    "效率": 0.0,
+    "质量": 0.0,
+    "团队": 0.0
+  }
+}
